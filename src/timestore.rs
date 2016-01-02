@@ -47,24 +47,24 @@ impl TimeStore {
         });
     }
 
-    pub fn record(&mut self, series: String, ts: TimestampSeconds, value: &[u8]) -> Result<(), Error> {
+    pub fn record(&mut self, series: &str, ts: TimestampSeconds, value: &[u8]) -> Result<(), Error> {
         let opts = WriteOptions::new();
         // TODO(mrjones): handle unknown series
-        let database = self.databases.get(&series).unwrap();
+        let database = self.databases.get(series).unwrap();
         return database.put(opts, ts, value);
     }
 
-    pub fn lookup(&mut self, series: String, ts: TimestampSeconds) -> Result<Option<Vec<u8>>, Error> {
+    pub fn lookup(&mut self, series: &str, ts: TimestampSeconds) -> Result<Option<Vec<u8>>, Error> {
         let opts = ReadOptions::new();
         // TODO(mrjones): handle unknown series
-        let database = self.databases.get(&series).unwrap();
+        let database = self.databases.get(series).unwrap();
         return database.get(opts, ts);
     }
 
-    pub fn scan(&mut self, series: String, start: TimestampSeconds, end: TimestampSeconds) -> Result<Vec<(i32, Vec<u8>)>, Error> {
+    pub fn scan(&mut self, series: &str, start: TimestampSeconds, end: TimestampSeconds) -> Result<Vec<(i32, Vec<u8>)>, Error> {
         // TODO(mrjones): handle unknown series
         // TODO(mrjones): handle scanning multiple serieses
-        let database = self.databases.get(&series).unwrap();
+        let database = self.databases.get(series).unwrap();
 
         let opts = ReadOptions::new();
         let mut iter = database.iter(opts);
@@ -95,8 +95,8 @@ mod tests {
         let mut ts = TimeStore::open(
             tempdir.path(), simple_schema())
             .expect("TimeStore::Open");
-        ts.record("data".to_string(), 12345, &[0, 1, 2, 3]).expect("record");
-        assert_eq!(vec![0, 1, 2, 3], ts.lookup("data".to_string(), 12345).unwrap().unwrap());
+        ts.record("data", 12345, &[0, 1, 2, 3]).expect("record");
+        assert_eq!(vec![0, 1, 2, 3], ts.lookup("data", 12345).unwrap().unwrap());
     }
 
     #[test]
@@ -106,10 +106,10 @@ mod tests {
             tempdir.path(), simple_schema())
             .expect("TimeStore::Open");
         for i in 1..5 {
-            ts.record("data".to_string(), i, &[i as u8]).expect("record");
+            ts.record("data", i, &[i as u8]).expect("record");
         }
 
-        let res = ts.scan("data".to_string(), 2, 4).expect("scan");
+        let res = ts.scan("data", 2, 4).expect("scan");
         assert_eq!(2, res.len());
         assert_eq!((2, vec![2]), res[0]);
         assert_eq!((3, vec![3]), res[1]);
@@ -120,18 +120,17 @@ mod tests {
         let schema = Schema{serieses: vec!["data1".to_string(), "data2".to_string()]};
 
         let tempdir = TempDir::new("record_then_lookup").unwrap();
-        let mut ts = TimeStore::open(
-            tempdir.path(), schema)
+        let mut ts = TimeStore::open(tempdir.path(), schema)
             .expect("TimeStore::Open");
-        ts.record("data1".to_string(), 12345, &[1, 1, 1, 1]).expect("record");
-        ts.record("data2".to_string(), 67890, &[2, 2, 2, 2]).expect("record");
+        ts.record("data1", 12345, &[1, 1, 1, 1]).expect("record");
+        ts.record("data2", 67890, &[2, 2, 2, 2]).expect("record");
 
         assert_eq!(vec![1, 1, 1, 1],
-                   ts.lookup("data1".to_string(), 12345).unwrap().unwrap());
-        assert!(ts.lookup("data2".to_string(), 12345).unwrap().is_none());
+                   ts.lookup("data1", 12345).unwrap().unwrap());
+        assert!(ts.lookup("data2", 12345).unwrap().is_none());
 
-        assert!(ts.lookup("data1".to_string(), 67890).unwrap().is_none());
+        assert!(ts.lookup("data1", 67890).unwrap().is_none());
         assert_eq!(vec![2, 2, 2, 2],
-                   ts.lookup("data2".to_string(), 67890).unwrap().unwrap());
+                   ts.lookup("data2", 67890).unwrap().unwrap());
     }
 }
