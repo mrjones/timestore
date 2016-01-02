@@ -1,4 +1,5 @@
 extern crate leveldb;
+extern crate db_key;
 
 use self::leveldb::database::kv::KV;
 use self::leveldb::database::Database;
@@ -12,8 +13,10 @@ use self::leveldb::options::WriteOptions;
 use std::path;
 use std::vec;
 
+pub type TimestampSeconds = i32;
+
 pub struct TimeStore {
-    database: Box<Database<i32>>,
+    database: Box<Database<TimestampSeconds>>,
 }
 
 impl TimeStore {
@@ -25,17 +28,17 @@ impl TimeStore {
         return Ok(TimeStore{database: Box::new(db)});
     }
 
-    pub fn record(&mut self, ts: i32, value: &[u8]) -> Result<(), Error> {
+    pub fn record(&mut self, ts: TimestampSeconds, value: &[u8]) -> Result<(), Error> {
         let opts = WriteOptions::new();
         return self.database.put(opts, ts, value);
     }
 
-    pub fn lookup(&mut self, ts: i32) -> Result<Option<vec::Vec<u8>>, Error> {
+    pub fn lookup(&mut self, ts: TimestampSeconds) -> Result<Option<vec::Vec<u8>>, Error> {
         let opts = ReadOptions::new();
         return self.database.get(opts, ts);
     }
 
-    pub fn scan(&mut self, start: i32, end: i32) -> Result<vec::Vec<(i32, vec::Vec<u8>)>, Error> {
+    pub fn scan(&mut self, start: TimestampSeconds, end: TimestampSeconds) -> Result<vec::Vec<(i32, vec::Vec<u8>)>, Error> {
         let opts = ReadOptions::new();
         let mut iter = self.database.iter(opts);
         iter.seek(&start);
@@ -43,7 +46,6 @@ impl TimeStore {
         let mut result = Vec::new();
         while iter.advance() && iter.key() < end {
             result.push((iter.key(), iter.value()));
-            println!("{:?} = {:?}", iter.key(), iter.value());
         }
         return Ok(result);
     }
