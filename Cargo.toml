@@ -1,0 +1,8 @@
+[package]
+name = "timestore"
+version = "0.1.0"
+authors = ["Matt Jones <jonesmr@gmail.com>"]
+
+[dependencies]
+leveldb = "*"
+tempdir = "*"
