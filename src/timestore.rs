@@ -10,8 +10,8 @@ use self::leveldb::options::Options;
 use self::leveldb::options::ReadOptions;
 use self::leveldb::options::WriteOptions;
 
-use std::path;
-use std::vec;
+use std::path::Path;
+use std::vec::Vec;
 
 pub type TimestampSeconds = i32;
 
@@ -20,7 +20,7 @@ pub struct TimeStore {
 }
 
 impl TimeStore {
-    pub fn open<P: AsRef<path::Path>>(path: P) -> Result<TimeStore, Error> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<TimeStore, Error> {
         let mut options = Options::new();
         options.create_if_missing = true;
 
@@ -33,12 +33,12 @@ impl TimeStore {
         return self.database.put(opts, ts, value);
     }
 
-    pub fn lookup(&mut self, ts: TimestampSeconds) -> Result<Option<vec::Vec<u8>>, Error> {
+    pub fn lookup(&mut self, ts: TimestampSeconds) -> Result<Option<Vec<u8>>, Error> {
         let opts = ReadOptions::new();
         return self.database.get(opts, ts);
     }
 
-    pub fn scan(&mut self, start: TimestampSeconds, end: TimestampSeconds) -> Result<vec::Vec<(i32, vec::Vec<u8>)>, Error> {
+    pub fn scan(&mut self, start: TimestampSeconds, end: TimestampSeconds) -> Result<Vec<(i32, Vec<u8>)>, Error> {
         let opts = ReadOptions::new();
         let mut iter = self.database.iter(opts);
         iter.seek(&start);
