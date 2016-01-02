@@ -123,10 +123,15 @@ mod tests {
         let mut ts = TimeStore::open(
             tempdir.path(), schema)
             .expect("TimeStore::Open");
-        ts.record("data1".to_string(), 12345, &[0, 1, 2, 3]).expect("record");
-        assert_eq!(vec![0, 1, 2, 3],
+        ts.record("data1".to_string(), 12345, &[1, 1, 1, 1]).expect("record");
+        ts.record("data2".to_string(), 67890, &[2, 2, 2, 2]).expect("record");
+
+        assert_eq!(vec![1, 1, 1, 1],
                    ts.lookup("data1".to_string(), 12345).unwrap().unwrap());
-        // TODO(mrjones): these series shouldn't overlap
         assert!(ts.lookup("data2".to_string(), 12345).unwrap().is_none());
+
+        assert!(ts.lookup("data1".to_string(), 67890).unwrap().is_none());
+        assert_eq!(vec![2, 2, 2, 2],
+                   ts.lookup("data2".to_string(), 67890).unwrap().unwrap());
     }
 }
