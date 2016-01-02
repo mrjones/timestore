@@ -3,6 +3,8 @@ extern crate leveldb;
 use self::leveldb::database::kv::KV;
 use self::leveldb::database::Database;
 use self::leveldb::error::Error;
+use self::leveldb::iterator::Iterable;
+use self::leveldb::iterator::LevelDBIterator;
 use self::leveldb::options::Options;
 use self::leveldb::options::ReadOptions;
 use self::leveldb::options::WriteOptions;
@@ -32,6 +34,19 @@ impl TimeStore {
         let opts = ReadOptions::new();
         return self.database.get(opts, ts);
     }
+
+    pub fn scan(&mut self, start: i32, end: i32) -> Result<vec::Vec<(i32, vec::Vec<u8>)>, Error> {
+        let opts = ReadOptions::new();
+        let mut iter = self.database.iter(opts);
+        iter.seek(&start);
+
+        let mut result = Vec::new();
+        while iter.advance() && iter.key() < end {
+            result.push((iter.key(), iter.value()));
+            println!("{:?} = {:?}", iter.key(), iter.value());
+        }
+        return Ok(result);
+    }
 }
 
 #[cfg(test)]
@@ -47,5 +62,19 @@ mod tests {
         let mut ts = TimeStore::open(tempdir.path()).expect("TimeStore::Open");
         ts.record(12345, &[0, 1, 2, 3]).expect("record");
         assert_eq!(vec![0, 1, 2, 3], ts.lookup(12345).unwrap().unwrap());
+    }
+
+    #[test]
+    fn scan() {
+        let tempdir = TempDir::new("scan").unwrap();
+        let mut ts = TimeStore::open(tempdir.path()).expect("TimeStore::Open");
+        for i in 1..5 {
+            ts.record(i, &[i as u8]).expect("record");
+        }
+
+        let res = ts.scan(2, 4).expect("scan");
+        assert_eq!(2, res.len());
+        assert_eq!((2, vec![2]), res[0]);
+        assert_eq!((3, vec![3]), res[1]);
     }
 }
