@@ -19,58 +19,52 @@ pub type TimestampSeconds = i32;
 pub struct TimeStore {
     databases: Box<HashMap<String, Box<Database<TimestampSeconds>>>>,
 //    schema: Schema,
-    series_to_family_map: HashMap<String, String>,
 }
 
 pub struct Schema {
-    schema: HashMap<String, Vec<String>>,
+    // TODO(mrjones): combine multiple series in a family for performance
+    serieses: Vec<String>,
 }
 
 impl TimeStore {
     pub fn open<P: AsRef<Path>>(path: P, schema: Schema) -> Result<TimeStore, Error> {
         let mut databases : Box<HashMap<String, Box<Database<TimestampSeconds>>>> = Box::new(HashMap::new());
-        let mut series_to_family_map = HashMap::new();
 
-        for (family, serieses) in &schema.schema {
-            for series in serieses {
-                series_to_family_map.insert(series.clone(), family.clone());
-            }
+        for series in schema.serieses {
+            let mut pathbuf = path.as_ref().to_path_buf();
+            pathbuf.push(&series);
 
             let mut options = Options::new();
             options.create_if_missing = true;
             databases.insert(
-                family.clone(),
-                Box::new(try!(Database::open(path.as_ref(),options))));
+                series.clone(),
+                Box::new(try!(Database::open(pathbuf.as_path(), options))));
         }
-
+          
         return Ok(TimeStore{
             databases: databases,
 //            schema: schema,
-            series_to_family_map: series_to_family_map.clone(),
         });
     }
 
     pub fn record(&mut self, series: String, ts: TimestampSeconds, value: &[u8]) -> Result<(), Error> {
         let opts = WriteOptions::new();
-        // TODO(mrjones): handle unknown family
-        let family = self.series_to_family_map.get(&series).unwrap();
-        let database = self.databases.get(family).unwrap();
+        // TODO(mrjones): handle unknown series
+        let database = self.databases.get(&series).unwrap();
         return database.put(opts, ts, value);
     }
 
     pub fn lookup(&mut self, series: String, ts: TimestampSeconds) -> Result<Option<Vec<u8>>, Error> {
         let opts = ReadOptions::new();
-        // TODO(mrjones): handle unknown family
-        let family = self.series_to_family_map.get(&series).unwrap();
-        let database = self.databases.get(family).unwrap();
+        // TODO(mrjones): handle unknown series
+        let database = self.databases.get(&series).unwrap();
         return database.get(opts, ts);
     }
 
     pub fn scan(&mut self, series: String, start: TimestampSeconds, end: TimestampSeconds) -> Result<Vec<(i32, Vec<u8>)>, Error> {
-        // TODO(mrjones): handle unknown family
+        // TODO(mrjones): handle unknown series
         // TODO(mrjones): handle scanning multiple serieses
-        let family = self.series_to_family_map.get(&series).unwrap();
-        let database = self.databases.get(family).unwrap();
+        let database = self.databases.get(&series).unwrap();
 
         let opts = ReadOptions::new();
         let mut iter = database.iter(opts);
@@ -91,12 +85,8 @@ mod tests {
     use super::*;
     use self::tempdir::TempDir;
 
-    use std::collections::HashMap;
-
     fn simple_schema() -> Schema {
-        let mut map = HashMap::new();
-        map.insert("family".to_string(), vec!["data".to_string()]);
-        return Schema{schema: map};
+        return Schema{serieses: vec!["data".to_string()]};
     }
 
     #[test]
@@ -127,10 +117,7 @@ mod tests {
 
     #[test]
     fn multiple_series() {
-        let mut map = HashMap::new();
-        map.insert("family".to_string(),
-                   vec!["data1".to_string(), "data2".to_string()]);
-        let schema = Schema{schema: map};
+        let schema = Schema{serieses: vec!["data1".to_string(), "data2".to_string()]};
 
         let tempdir = TempDir::new("record_then_lookup").unwrap();
         let mut ts = TimeStore::open(
