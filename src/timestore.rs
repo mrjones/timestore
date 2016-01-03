@@ -26,6 +26,24 @@ pub struct Schema {
     serieses: Vec<String>,
 }
 
+pub struct TSIterator<'a> {
+    leveldb_iter: Box<leveldb::iterator::Iterator<'a, TimestampSeconds>>,
+    limit: TimestampSeconds,
+}
+
+impl<'a> Iterator for TSIterator<'a> {
+    type Item = (TimestampSeconds, Vec<u8>);
+
+    fn next(&mut self) -> Option<(TimestampSeconds, Vec<u8>)> {
+        if self.leveldb_iter.advance() &&
+            (self.leveldb_iter.key() < self.limit) {
+            return Some((self.leveldb_iter.key(), self.leveldb_iter.value()));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl TimeStore {
     pub fn open<P: AsRef<Path>>(path: P, schema: Schema) -> Result<TimeStore, Error> {
         let mut databases : Box<HashMap<String, Box<Database<TimestampSeconds>>>> = Box::new(HashMap::new());
@@ -76,6 +94,18 @@ impl TimeStore {
         }
         return Ok(result);
     }
+
+    pub fn scan_iter(&mut self, series: &str, start: TimestampSeconds, end: TimestampSeconds) -> Result<TSIterator, Error> {
+        // TODO(mrjones): handle unknown series
+        let database = self.databases.get(series).unwrap();
+
+        let opts = ReadOptions::new();
+        let iter = Box::new(database.iter(opts));
+        iter.seek(&start);
+        
+
+        return Ok(TSIterator{leveldb_iter: iter, limit: end});
+    }
 }
 
 #[cfg(test)]
@@ -113,6 +143,22 @@ mod tests {
         assert_eq!(2, res.len());
         assert_eq!((2, vec![2]), res[0]);
         assert_eq!((3, vec![3]), res[1]);
+    }
+
+    #[test]
+    fn scan_iter() {
+        let tempdir = TempDir::new("scan_iter").unwrap();
+        let mut ts = TimeStore::open(
+            tempdir.path(), simple_schema())
+            .expect("TimeStore::Open");
+        for i in 1..5 {
+            ts.record("data", i, &[i as u8]).expect("record");
+        }
+
+        let mut iter = ts.scan_iter("data", 2, 4).expect("scan");
+        assert_eq!((2, vec![2]), iter.next().expect("unwrap 2"));
+        assert_eq!((3, vec![3]), iter.next().expect("unwrap 2"));
+        assert!(iter.next().is_none());
     }
 
     #[test]
